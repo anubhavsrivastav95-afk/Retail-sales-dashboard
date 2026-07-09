@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Retail Pulse — Analyst Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0b0d10;
+    --bg-card:#14171b;
+    --bg-card-2:#191d22;
+    --text:#e8e6e1;
+    --text-dim:#8b9099;
+    --text-faint:#565c66;
+    --amber:#f2b84b;
+    --teal:#3ec6b3;
+    --red:#e2574c;
+    --border:#262b32;
+    --border-soft:#1c2026;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    background-image:
+      radial-gradient(circle at 15% 10%, rgba(242,184,75,0.05), transparent 40%),
+      radial-gradient(circle at 85% 90%, rgba(62,198,179,0.05), transparent 40%);
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+
+  /* ===== Header ===== */
+  header{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    padding:28px 36px 20px;border-bottom:1px solid var(--border);
+    flex-wrap:wrap;gap:16px;
+  }
+  .brand{display:flex;align-items:center;gap:14px;}
+  .barcode{
+    display:flex;align-items:flex-end;gap:2px;height:34px;
+  }
+  .barcode span{display:block;width:2px;background:var(--amber);}
+  .brand-text h1{
+    font-family:'JetBrains Mono',monospace;font-weight:800;font-size:22px;
+    letter-spacing:0.5px;
+  }
+  .brand-text p{color:var(--text-dim);font-size:12.5px;margin-top:2px;letter-spacing:0.3px;}
+  .header-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .btn{
+    font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;
+    background:var(--bg-card);color:var(--text);border:1px solid var(--border);
+    padding:9px 14px;border-radius:6px;cursor:pointer;letter-spacing:0.3px;
+    display:flex;align-items:center;gap:6px;transition:.15s;
+  }
+  .btn:hover{border-color:var(--amber);color:var(--amber);}
+  .btn.primary{background:var(--amber);color:#1a1206;border-color:var(--amber);}
+  .btn.primary:hover{opacity:0.9;color:#1a1206;}
+  input[type=file]{display:none;}
+
+  main{padding:28px 36px 60px;max-width:1440px;margin:0 auto;}
+
+  /* ===== KPI price-tag cards ===== */
+  .kpi-row{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    gap:16px;margin-bottom:28px;
+  }
+  .tag{
+    position:relative;background:var(--bg-card);border:1px solid var(--border);
+    border-radius:4px 10px 10px 4px;padding:18px 18px 14px 22px;
+    overflow:hidden;
+  }
+  .tag::before{
+    content:'';position:absolute;left:8px;top:50%;transform:translateY(-50%);
+    width:8px;height:8px;border-radius:50%;background:var(--bg);
+    border:1px solid var(--border);
+  }
+  .tag .label{
+    font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-dim);
+    text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;
+  }
+  .tag .value{
+    font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:800;
+    line-height:1;margin-bottom:8px;
+  }
+  .tag .delta{font-size:11.5px;font-weight:600;}
+  .delta.up{color:var(--teal);}
+  .delta.down{color:var(--red);}
+  .tag .barcode-strip{
+    margin-top:12px;display:flex;gap:1.5px;height:14px;opacity:0.5;
+  }
+  .tag .barcode-strip span{display:block;width:1.5px;background:var(--text-faint);}
+
+  /* ===== Panels ===== */
+  .panel{
+    background:var(--bg-card);border:1px solid var(--border);border-radius:10px;
+    padding:20px 22px;margin-bottom:24px;
+  }
+  .panel-head{
+    display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;
+    flex-wrap:wrap;gap:10px;
+  }
+  .panel-head h2{
+    font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;
+    letter-spacing:0.4px;display:flex;align-items:center;gap:8px;
+  }
+  .panel-head h2 .dot{width:7px;height:7px;border-radius:50%;background:var(--amber);}
+  .panel-sub{color:var(--text-dim);font-size:11.5px;}
+
+  .grid-2{display:grid;grid-template-columns:1.3fr 1fr;gap:22px;}
+  @media(max-width:900px){.grid-2{grid-template-columns:1fr;}}
+
+  .chart-wrap{height:280px;position:relative;}
+  .chart-wrap.tall{height:340px;}
+
+  select, .filter-pill{
+    font-family:'JetBrains Mono',monospace;font-size:11.5px;background:var(--bg-card-2);
+    color:var(--text);border:1px solid var(--border);padding:6px 10px;border-radius:6px;
+    cursor:pointer;
+  }
+  .pill-group{display:flex;gap:6px;}
+  .filter-pill.active{border-color:var(--amber);color:var(--amber);}
+
+  /* ===== Tables ===== */
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th{
+    text-align:left;font-family:'JetBrains Mono',monospace;font-size:10.5px;
+    color:var(--text-dim);text-transform:uppercase;letter-spacing:0.6px;
+    padding:8px 10px;border-bottom:1px solid var(--border);font-weight:600;
+  }
+  td{padding:9px 10px;border-bottom:1px solid var(--border-soft);}
+  tr:hover td{background:rgba(255,255,255,0.015);}
+  .num{font-family:'JetBrains Mono',monospace;text-align:right;}
+  .badge{
+    font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;
+    border-radius:20px;font-weight:700;letter-spacing:0.3px;display:inline-block;
+  }
+  .badge.healthy{background:rgba(62,198,179,0.12);color:var(--teal);}
+  .badge.low{background:rgba(226,87,76,0.14);color:var(--red);}
+  .badge.watch{background:rgba(242,184,75,0.14);color:var(--amber);}
+  .bar-mini{
+    height:5px;border-radius:3px;background:var(--border-soft);overflow:hidden;
+    width:90px;margin-top:4px;
+  }
+  .bar-mini i{display:block;height:100%;background:var(--amber);}
+
+  /* ===== AI Insights ===== */
+  .ai-box textarea{
+    width:100%;background:var(--bg-card-2);border:1px solid var(--border);
+    color:var(--text);font-family:'Inter',sans-serif;font-size:13px;
+    padding:12px;border-radius:8px;resize:vertical;min-height:60px;
+  }
+  .ai-output{
+    margin-top:14px;font-size:13.5px;line-height:1.65;color:var(--text);
+    white-space:pre-wrap;
+  }
+  .ai-output .placeholder{color:var(--text-faint);font-style:italic;}
+  .loading-dots::after{
+    content:'';animation:dots 1.2s steps(4,end) infinite;
+  }
+  @keyframes dots{0%,20%{content:'.'}40%{content:'..'}60%,100%{content:'...'}}
+
+  footer{text-align:center;color:var(--text-faint);font-size:11px;padding:20px;font-family:'JetBrains Mono',monospace;}
+
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+
+  @media(max-width:640px){
+    header{padding:20px;}main{padding:20px;}
+    .brand-text h1{font-size:18px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="barcode" id="barcodeLogo"></div>
+    <div class="brand-text">
+      <h1>RETAIL PULSE</h1>
+      <p>Inventory · Sales · Margin — analyst console</p>
+    </div>
+  </div>
+  <div class="header-actions">
+    <label class="btn" for="csvInput">⇪ Import CSV</label>
+    <input type="file" id="csvInput" accept=".csv">
+    <button class="btn" id="sampleBtn">↻ Load sample data</button>
+    <button class="btn" id="exportBtn">⇩ Export CSV</button>
+    <button class="btn primary" id="resetBtn">⟲ Reset</button>
+  </div>
+</header>
+
+<main>
+
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2><span class="dot"></span>Revenue &amp; Margin Trend</h2>
+      <div class="pill-group" id="trendRange">
+        <span class="filter-pill" data-range="7">7D</span>
+        <span class="filter-pill active" data-range="30">30D</span>
+        <span class="filter-pill" data-range="90">All</span>
+      </div>
+    </div>
+    <div class="chart-wrap tall"><canvas id="trendChart"></canvas></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-head">
+        <h2><span class="dot"></span>Revenue by Category</h2>
+        <span class="panel-sub" id="catSub"></span>
+      </div>
+      <div class="chart-wrap"><canvas id="catChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <h2><span class="dot"></span>Top 8 Products</h2>
+        <span class="panel-sub">by revenue</span>
+      </div>
+      <div class="chart-wrap"><canvas id="topProductsChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2><span class="dot"></span>Store Performance</h2>
+      <span class="panel-sub" id="storeSub"></span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table id="storeTable">
+        <thead><tr><th>Store</th><th class="num">Revenue</th><th class="num">Units</th><th class="num">Margin %</th><th>Trend</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2><span class="dot"></span>Inventory Risk</h2>
+      <div class="pill-group" id="stockFilter">
+        <span class="filter-pill active" data-filter="all">All</span>
+        <span class="filter-pill" data-filter="low">Low stock only</span>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table id="stockTable">
+        <thead><tr><th>Product</th><th>Category</th><th class="num">Stock</th><th class="num">Reorder pt</th><th>Status</th><th>Coverage</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel ai-box">
+    <div class="panel-head">
+      <h2><span class="dot"></span>AI Insights</h2>
+      <span class="panel-sub">powered by Claude</span>
+    </div>
+    <textarea id="aiPrompt" placeholder="Ask something about this data — e.g. 'Which category has the weakest margin and why might that be?' or leave blank for a general summary.">Give me 4 sharp, specific insights and 2 concrete actions based on this retail dataset — focus on margin, inventory risk, and any store/category outliers.</textarea>
+    <div style="margin-top:10px;display:flex;gap:10px;">
+      <button class="btn primary" id="askAiBtn">✦ Generate insights</button>
+    </div>
+    <div class="ai-output" id="aiOutput"><span class="placeholder">Insights will appear here.</span></div>
+  </div>
+
+</main>
+
+<footer>RETAIL PULSE · single-file analyst dashboard · data stays in your browser</footer>
+
+<script>
+// ================= Barcode logo =================
+(function(){
+  const bc = document.getElementById('barcodeLogo');
+  const widths = [2,1,3,1,2,3,1,2,1,3,2,1];
+  widths.forEach(w=>{
+    const s = document.createElement('span');
+    s.style.width = w+'px';
+    s.style.height = (14+Math.random()*20)+'px';
+    bc.appendChild(s);
+  });
+})();
+
+// ================= Sample data generation =================
+const CATEGORIES = ['Apparel','Electronics','Grocery','Home & Living','Beauty','Sports'];
+const STORES = ['Lucknow Central','Gomti Nagar','Hazratganj','Alambagh','Aliganj'];
+const PRODUCT_NAMES = {
+  'Apparel':['Denim Jacket','Cotton Tee','Formal Shirt','Running Shorts','Wool Sweater'],
+  'Electronics':['Wireless Earbuds','Power Bank 20K','Smartwatch','Bluetooth Speaker','USB-C Cable'],
+  'Grocery':['Basmati Rice 5kg','Cooking Oil 1L','Green Tea Pack','Atta 10kg','Masala Combo'],
+  'Home & Living':['Table Lamp','Bedsheet Set','Non-stick Pan','Storage Box','Wall Clock'],
+  'Beauty':['Face Wash','Sunscreen SPF50','Shampoo 400ml','Lip Balm Set','Body Lotion'],
+  'Sports':['Yoga Mat','Cricket Bat','Football','Dumbbell Set','Skipping Rope']
+};
+
+let rawData = [];
+let stockData = [];
+
+function randBetween(a,b){return a+Math.random()*(b-a);}
+function seedDate(daysAgo){const d=new Date();d.setDate(d.getDate()-daysAgo);return d.toISOString().slice(0,10);}
+
+function generateSampleData(){
+  rawData = [];
+  stockData = [];
+  let stockId = 0;
+  CATEGORIES.forEach(cat=>{
+    PRODUCT_NAMES[cat].forEach(prod=>{
+      const reorderPt = Math.round(randBetween(15,40));
+      const stock = Math.round(randBetween(0,90));
+      stockData.push({
+        id: stockId++, product: prod, category: cat,
+        stock: stock, reorderPt: reorderPt
+      });
+    });
+  });
+
+  for(let day=29; day>=0; day--){
+    const date = seedDate(day);
+    STORES.forEach(store=>{
+      const numTx = Math.round(randBetween(3,9));
+      for(let i=0;i<numTx;i++){
+        const cat = CATEGORIES[Math.floor(Math.random()*CATEGORIES.length)];
+        const prodList = PRODUCT_NAMES[cat];
+        const prod = prodList[Math.floor(Math.random()*prodList.length)];
+        const units = Math.round(randBetween(1,12));
+        const unitPrice = Math.round(randBetween(199,4999));
+        const cost = unitPrice * randBetween(0.55,0.8);
+        const revenue = units*unitPrice;
+        const costTotal = units*cost;
+        rawData.push({
+          date, store, category:cat, product:prod,
+          units, revenue: Math.round(revenue), cost: Math.round(costTotal)
+        });
+      }
+    });
+  }
+}
+
+// ================= CSV parsing (lightweight, no deps) =================
+function parseCSV(text){
+  const lines = text.trim().split(/\r?\n/);
+  const headers = lines[0].split(',').map(h=>h.trim().toLowerCase());
+  const rows = [];
+  for(let i=1;i<lines.length;i++){
+    if(!lines[i].trim()) continue;
+    const cells = lines[i].split(',');
+    const row = {};
+    headers.forEach((h,idx)=>row[h]=cells[idx]?cells[idx].trim():'');
+    rows.push(row);
+  }
+  return rows;
+}
+
+document.getElementById('csvInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    try{
+      const rows = parseCSV(ev.target.result);
+      rawData = rows.map(r=>({
+        date: r.date || seedDate(0),
+        store: r.store || 'Unknown',
+        category: r.category || 'Other',
+        product: r.product || 'Item',
+        units: parseFloat(r.units)||0,
+        revenue: parseFloat(r.revenue)||0,
+        cost: parseFloat(r.cost)|| (parseFloat(r.revenue)||0)*0.7
+      }));
+      // Rebuild stock data from unique products if not provided separately
+      const seen = new Set();
+      stockData = [];
+      let id=0;
+      rawData.forEach(r=>{
+        const key = r.product+'|'+r.category;
+        if(!seen.has(key)){
+          seen.add(key);
+          stockData.push({
+            id:id++, product:r.product, category:r.category,
+            stock: Math.round(randBetween(0,90)),
+            reorderPt: Math.round(randBetween(15,40))
+          });
+        }
+      });
+      renderAll();
+    }catch(err){
+      alert('Could not parse that CSV. Expected columns: date, store, category, product, units, revenue, cost');
+    }
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById('sampleBtn').addEventListener('click', ()=>{ generateSampleData(); renderAll(); });
+document.getElementById('resetBtn').addEventListener('click', ()=>{ generateSampleData(); renderAll(); });
+
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const headers = ['date','store','category','product','units','revenue','cost'];
+  const csvRows = [headers.join(',')];
+  rawData.forEach(r=>{
+    csvRows.push(headers.map(h=>r[h]).join(','));
+  });
+  const blob = new Blob([csvRows.join('\n')], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'retail_pulse_export.csv'; a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ================= Chart instances =================
+let trendChart, catChart, topProductsChart;
+let currentRange = 30;
+
+function fmtMoney(n){
+  if(n>=100000) return '₹'+(n/100000).toFixed(1)+'L';
+  if(n>=1000) return '₹'+(n/1000).toFixed(1)+'K';
+  return '₹'+Math.round(n);
+}
+
+function renderKPIs(){
+  const totalRevenue = rawData.reduce((s,r)=>s+r.revenue,0);
+  const totalCost = rawData.reduce((s,r)=>s+r.cost,0);
+  const totalUnits = rawData.reduce((s,r)=>s+r.units,0);
+  const margin = totalRevenue>0 ? ((totalRevenue-totalCost)/totalRevenue*100) : 0;
+  const lowStockCount = stockData.filter(s=>s.stock<=s.reorderPt).length;
+
+  const catTotals = {};
+  rawData.forEach(r=>catTotals[r.category]=(catTotals[r.category]||0)+r.revenue);
+  const topCat = Object.entries(catTotals).sort((a,b)=>b[1]-a[1])[0];
+
+  const kpis = [
+    {label:'Total Revenue', value: fmtMoney(totalRevenue), delta:'+ live', cls:'up'},
+    {label:'Gross Margin', value: margin.toFixed(1)+'%', delta: margin>25?'Healthy':'Watch', cls: margin>25?'up':'down'},
+    {label:'Units Sold', value: totalUnits.toLocaleString(), delta:'across all stores', cls:'up'},
+    {label:'Low Stock SKUs', value: lowStockCount, delta: lowStockCount>0?'Needs reorder':'All stocked', cls: lowStockCount>0?'down':'up'},
+    {label:'Top Category', value: topCat?topCat[0]:'—', delta: topCat?fmtMoney(topCat[1])+' revenue':'', cls:'up'},
+  ];
+
+  const row = document.getElementById('kpiRow');
+  row.innerHTML = kpis.map(k=>`
+    <div class="tag">
+      <div class="label">${k.label}</div>
+      <div class="value">${k.value}</div>
+      <div class="delta ${k.cls}">${k.delta}</div>
+      <div class="barcode-strip">${Array.from({length:22},()=>`<span style="width:${Math.random()>0.5?1:2}px;height:${8+Math.random()*6}px"></span>`).join('')}</div>
+    </div>
+  `).join('');
+}
+
+function renderTrendChart(){
+  const days = [...new Set(rawData.map(r=>r.date))].sort();
+  const sliceDays = currentRange>=days.length ? days : days.slice(-currentRange);
+  const revByDay = sliceDays.map(d=>rawData.filter(r=>r.date===d).reduce((s,r)=>s+r.revenue,0));
+  const marginByDay = sliceDays.map(d=>{
+    const dayRows = rawData.filter(r=>r.date===d);
+    const rev = dayRows.reduce((s,r)=>s+r.revenue,0);
+    const cost = dayRows.reduce((s,r)=>s+r.cost,0);
+    return rev>0 ? ((rev-cost)/rev*100) : 0;
+  });
+
+  const ctx = document.getElementById('trendChart');
+  if(trendChart) trendChart.destroy();
+  trendChart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: sliceDays,
+      datasets:[
+        {
+          label:'Revenue', data:revByDay, yAxisID:'y',
+          borderColor:'#f2b84b', backgroundColor:'rgba(242,184,75,0.08)',
+          fill:true, tension:0.35, pointRadius:0, borderWidth:2
+        },
+        {
+          label:'Margin %', data:marginByDay, yAxisID:'y1',
+          borderColor:'#3ec6b3', backgroundColor:'transparent',
+          fill:false, tension:0.35, pointRadius:0, borderWidth:2, borderDash:[4,3]
+        }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index', intersect:false},
+      plugins:{ legend:{labels:{color:'#8b9099', font:{family:'JetBrains Mono', size:11}}} },
+      scales:{
+        x:{ ticks:{color:'#565c66', font:{size:10}}, grid:{color:'#1c2026'} },
+        y:{ position:'left', ticks:{color:'#8b9099', font:{size:10}, callback:v=>fmtMoney(v)}, grid:{color:'#1c2026'} },
+        y1:{ position:'right', ticks:{color:'#8b9099', font:{size:10}, callback:v=>v+'%'}, grid:{display:false} }
+      }
+    }
+  });
+}
+
+function renderCatChart(){
+  const catTotals = {};
+  rawData.forEach(r=>catTotals[r.category]=(catTotals[r.category]||0)+r.revenue);
+  const labels = Object.keys(catTotals);
+  const values = Object.values(catTotals);
+  document.getElementById('catSub').textContent = labels.length+' categories';
+
+  const ctx = document.getElementById('catChart');
+  if(catChart) catChart.destroy();
+  catChart = new Chart(ctx, {
+    type:'doughnut',
+    data:{
+      labels,
+      datasets:[{
+        data:values,
+        backgroundColor:['#f2b84b','#3ec6b3','#e2574c','#8b9099','#7ea8ff','#c98be0'],
+        borderColor:'#14171b', borderWidth:2
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'right', labels:{color:'#8b9099', font:{family:'JetBrains Mono', size:10.5}, boxWidth:10}} }
+    }
+  });
+}
+
+function renderTopProducts(){
+  const prodTotals = {};
+  rawData.forEach(r=>prodTotals[r.product]=(prodTotals[r.product]||0)+r.revenue);
+  const sorted = Object.entries(prodTotals).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+  const ctx = document.getElementById('topProductsChart');
+  if(topProductsChart) topProductsChart.destroy();
+  topProductsChart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: sorted.map(s=>s[0]),
+      datasets:[{ data: sorted.map(s=>s[1]), backgroundColor:'#f2b84b', borderRadius:4 }]
+    },
+    options:{
+      indexAxis:'y',
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ ticks:{color:'#8b9099', font:{size:10}, callback:v=>fmtMoney(v)}, grid:{color:'#1c2026'} },
+        y:{ ticks:{color:'#8b9099', font:{family:'JetBrains Mono', size:10.5}}, grid:{display:false} }
+      }
+    }
+  });
+}
+
+function renderStoreTable(){
+  const stores = {};
+  rawData.forEach(r=>{
+    if(!stores[r.store]) stores[r.store]={revenue:0,units:0,cost:0};
+    stores[r.store].revenue += r.revenue;
+    stores[r.store].units += r.units;
+    stores[r.store].cost += r.cost;
+  });
+  const rowsArr = Object.entries(stores).sort((a,b)=>b[1].revenue-a[1].revenue);
+  document.getElementById('storeSub').textContent = rowsArr.length+' stores';
+  const tbody = document.querySelector('#storeTable tbody');
+  const maxRev = Math.max(...rowsArr.map(r=>r[1].revenue), 1);
+  tbody.innerHTML = rowsArr.map(([store,d])=>{
+    const margin = d.revenue>0 ? ((d.revenue-d.cost)/d.revenue*100) : 0;
+    const pct = (d.revenue/maxRev*100).toFixed(0);
+    return `<tr>
+      <td>${store}</td>
+      <td class="num">${fmtMoney(d.revenue)}</td>
+      <td class="num">${d.units.toLocaleString()}</td>
+      <td class="num">${margin.toFixed(1)}%</td>
+      <td><div class="bar-mini"><i style="width:${pct}%"></i></div></td>
+    </tr>`;
+  }).join('');
+}
+
+let stockFilterMode = 'all';
+function renderStockTable(){
+  const tbody = document.querySelector('#stockTable tbody');
+  let rows = stockData.slice();
+  if(stockFilterMode==='low') rows = rows.filter(s=>s.stock<=s.reorderPt);
+  rows.sort((a,b)=>(a.stock-a.reorderPt)-(b.stock-b.reorderPt));
+
+  tbody.innerHTML = rows.map(s=>{
+    const coverage = s.reorderPt>0 ? Math.min(100, Math.round(s.stock/s.reorderPt*100)) : 100;
+    let status, badgeCls;
+    if(s.stock<=s.reorderPt*0.5){status='Critical';badgeCls='low';}
+    else if(s.stock<=s.reorderPt){status='Low';badgeCls='low';}
+    else if(s.stock<=s.reorderPt*1.5){status='Watch';badgeCls='watch';}
+    else {status='Healthy';badgeCls='healthy';}
+    return `<tr>
+      <td>${s.product}</td>
+      <td>${s.category}</td>
+      <td class="num">${s.stock}</td>
+      <td class="num">${s.reorderPt}</td>
+      <td><span class="badge ${badgeCls}">${status}</span></td>
+      <td><div class="bar-mini"><i style="width:${coverage}%;background:${badgeCls==='low'?'var(--red)':badgeCls==='watch'?'var(--amber)':'var(--teal)'}"></i></div></td>
+    </tr>`;
+  }).join('');
+}
+
+document.querySelectorAll('#trendRange .filter-pill').forEach(pill=>{
+  pill.addEventListener('click', ()=>{
+    document.querySelectorAll('#trendRange .filter-pill').forEach(p=>p.classList.remove('active'));
+    pill.classList.add('active');
+    currentRange = parseInt(pill.dataset.range);
+    renderTrendChart();
+  });
+});
+
+document.querySelectorAll('#stockFilter .filter-pill').forEach(pill=>{
+  pill.addEventListener('click', ()=>{
+    document.querySelectorAll('#stockFilter .filter-pill').forEach(p=>p.classList.remove('active'));
+    pill.classList.add('active');
+    stockFilterMode = pill.dataset.filter;
+    renderStockTable();
+  });
+});
+
+function renderAll(){
+  renderKPIs();
+  renderTrendChart();
+  renderCatChart();
+  renderTopProducts();
+  renderStoreTable();
+  renderStockTable();
+}
+
+// ================= AI Insights (Claude API) =================
+document.getElementById('askAiBtn').addEventListener('click', async ()=>{
+  const output = document.getElementById('aiOutput');
+  const promptText = document.getElementById('aiPrompt').value.trim();
+  output.innerHTML = '<span class="placeholder">Generating insights<span class="loading-dots"></span></span>';
+
+  // Build a compact data summary to keep the prompt small
+  const catTotals = {};
+  rawData.forEach(r=>catTotals[r.category]=(catTotals[r.category]||0)+r.revenue);
+  const storeTotals = {};
+  rawData.forEach(r=>{
+    if(!storeTotals[r.store]) storeTotals[r.store]={revenue:0,cost:0};
+    storeTotals[r.store].revenue += r.revenue;
+    storeTotals[r.store].cost += r.cost;
+  });
+  const lowStock = stockData.filter(s=>s.stock<=s.reorderPt).map(s=>`${s.product} (${s.stock}/${s.reorderPt})`);
+  const totalRevenue = rawData.reduce((s,r)=>s+r.revenue,0);
+  const totalCost = rawData.reduce((s,r)=>s+r.cost,0);
+
+  const summary = {
+    total_revenue: totalRevenue,
+    total_margin_pct: totalRevenue>0 ? +((totalRevenue-totalCost)/totalRevenue*100).toFixed(1) : 0,
+    revenue_by_category: catTotals,
+    revenue_by_store: Object.fromEntries(Object.entries(storeTotals).map(([k,v])=>[k, {revenue:v.revenue, margin_pct: v.revenue>0?+((v.revenue-v.cost)/v.revenue*100).toFixed(1):0}])),
+    low_stock_products: lowStock.slice(0,20),
+    total_low_stock_count: lowStock.length
+  };
+
+  const systemPrompt = `You are a sharp retail data analyst. You will be given a JSON summary of a retail dataset (revenue, margin, category and store breakdowns, low-stock items). Respond in plain text, no markdown headers, using short punchy bullet-style lines (use "•" not "-" or "*"). Be specific and reference actual numbers from the data. Keep it concise: aim for under 180 words unless the user asks for more detail.`;
+
+  try{
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        model:"claude-sonnet-4-6",
+        max_tokens:1000,
+        system: systemPrompt,
+        messages:[
+          {role:"user", content: `Data summary:\n${JSON.stringify(summary)}\n\nRequest: ${promptText || 'Give a general summary with key insights.'}`}
+        ]
+      })
+    });
+    const data = await response.json();
+    const textBlocks = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text);
+    const text = textBlocks.join('\n').trim();
+    output.textContent = text || 'No response generated — try again.';
+  }catch(err){
+    output.innerHTML = '<span class="placeholder">Could not reach the AI right now. Check your connection and try again.</span>';
+  }
+});
+
+// ================= Init =================
+generateSampleData();
+renderAll();
+</script>
+</body>
+</html>
